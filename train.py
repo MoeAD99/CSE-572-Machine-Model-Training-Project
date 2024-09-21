@@ -111,7 +111,7 @@ def extract_cgm_data(cgm_df, insulin_df, cgm_datetime, insulin_datetime):
         if i == 0:
             valid_meals_start_times.append(datetime)
             continue
-        # If the last valid meal start time is in between the current meal start time and 2 hours ahead
+        # If the last valid meal start time is in between the current meal start time plus 2 hours ahead
         if valid_meals_start_times[-1] < datetime + pd.Timedelta(hours=2):
             # Skip the current meal start time
             continue
@@ -303,25 +303,15 @@ def extract_cgm_data(cgm_df, insulin_df, cgm_datetime, insulin_datetime):
         x for x in meal_stretch_cgm_data if len(x) == 30 and not x.hasnans
     ]
     no_meal_stretch_cgm_data = [
-        x for x in no_meal_stretch_cgm_data if len(x) == 24 and not x.hasnans
+        x.fillna(0).interpolate(method="polynomial", order=2)
+        for x in no_meal_stretch_cgm_data
+        if len(x) == 24 and x.isna().sum() <= 4
     ]
     print(np.sum([len(i) != 30 for i in meal_stretch_cgm_data]))
     print(np.sum([len(i) != 24 for i in no_meal_stretch_cgm_data]))
     # print(meal_stretch_cgm_data)
     print(np.array(meal_stretch_cgm_data).shape)
     print(np.array(no_meal_stretch_cgm_data).shape)
-
-    # print(i)
-    # print(j)
-    # print(pprint(no_meal_stretch_datetimes[120:144]))
-    # print(
-    #     valid_meals_start_times[-1],
-    #     insulin_df[insulin_df["Datetime"] == valid_meals_start_times[-1]][
-    #         "BWZ Carb Input (grams)"
-    #     ],
-    # )
-
-    # for start_time in total_postabsorptive_start_times:
 
     return np.array(meal_stretch_cgm_data[::-1]), np.array(
         no_meal_stretch_cgm_data[::-1]
@@ -334,6 +324,11 @@ def main():
     meal_cgm_data, no_meal_cgm_data = extract_cgm_data(
         cgm_df, insulin_df, cgm_datetime, insulin_datetime
     )
+    print("min mean meal    ", meal_cgm_data.min(axis=1).mean())
+    print("min mean no meal ", no_meal_cgm_data.min(axis=1).mean())
+
+    print("max mean meal    ", meal_cgm_data.max(axis=1).mean())
+    print("max mean no meal ", no_meal_cgm_data.max(axis=1).mean())
 
 
 main()
