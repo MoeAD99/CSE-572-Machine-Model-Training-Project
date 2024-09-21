@@ -20,32 +20,17 @@ def flatten(seq, container=None):
     return container
 
 
-def extract_data():
-    cgm_df = pd.read_csv("CGMData.csv")
-    insulin_df = pd.read_csv("InsulinData.csv")
+def extract_data(cgm_file,insulin_file):
+    cgm_df = pd.read_csv(cgm_file,low_memory=False)
+    insulin_df = pd.read_csv(insulin_file,low_memory=False)
     return cgm_df, insulin_df
 
 
 def parse_datetime(cgm_df, insulin_df):
-    cgm_date = cgm_df["Date"]
-    cgm_time = cgm_df["Time"]
-    cgm_datetime = [
-        dt.strptime(cgm_date[i] + " " + cgm_time[i], "%m/%d/%Y %H:%M:%S")
-        for i in range(len(cgm_date))
-    ]
+    insulin_df['Datetime']=pd.to_datetime(insulin_df['Date'] + ' ' + insulin_df['Time'])
+    cgm_df['Datetime']=pd.to_datetime(cgm_df['Date'] + ' ' + cgm_df['Time'])
 
-    cgm_df["Datetime"] = cgm_datetime  # Add the datetime to the DataFrame
-
-    insulin_date = insulin_df["Date"]
-    insulin_time = insulin_df["Time"]
-    insulin_datetime = [
-        dt.strptime(insulin_date[i] + " " + insulin_time[i], "%m/%d/%Y %H:%M:%S")
-        for i in range(len(insulin_date))
-    ]
-
-    insulin_df["Datetime"] = insulin_datetime  # Add the datetime to the DataFrame
-
-    return cgm_datetime, insulin_datetime
+    return cgm_df, insulin_df
 
 
 def extract_cgm_data(cgm_df, insulin_df, cgm_datetime, insulin_datetime):
@@ -319,16 +304,27 @@ def extract_cgm_data(cgm_df, insulin_df, cgm_datetime, insulin_datetime):
 
 
 def main():
-    cgm_df, insulin_df = extract_data()
+    cgm_df, insulin_df = extract_data("CGMData.csv","InsulinData.csv")
+    cgm_df2, insulin_df2 = extract_data("CGM_patient2.csv","Insulin_patient2.csv")
+    cgm_datetime2, insulin_datetime2 = parse_datetime(cgm_df2, insulin_df2)
     cgm_datetime, insulin_datetime = parse_datetime(cgm_df, insulin_df)
     meal_cgm_data, no_meal_cgm_data = extract_cgm_data(
         cgm_df, insulin_df, cgm_datetime, insulin_datetime
+    )
+    meal_cgm_data2, no_meal_cgm_data2 = extract_cgm_data(
+        cgm_df2, insulin_df2, cgm_datetime2, insulin_datetime2
     )
     print("min mean meal    ", meal_cgm_data.min(axis=1).mean())
     print("min mean no meal ", no_meal_cgm_data.min(axis=1).mean())
 
     print("max mean meal    ", meal_cgm_data.max(axis=1).mean())
     print("max mean no meal ", no_meal_cgm_data.max(axis=1).mean())
+
+    print("min mean meal 2    ", meal_cgm_data2.min(axis=1).mean())
+    print("min mean no meal 2 ", no_meal_cgm_data2.min(axis=1).mean())
+
+    print("max mean meal 2    ", meal_cgm_data2.max(axis=1).mean())
+    print("max mean no meal 2 ", no_meal_cgm_data2.max(axis=1).mean())
 
 
 main()
