@@ -31,7 +31,10 @@ def extract_no_meal_data(
     insulin_df,
     cgm_df,
 ):
-
+    postabsorptive_period_start_times = []
+    total_postabsorptive_datetimes = []
+    total_postabsorptive_start_times = []
+    no_meal_stretch = []
     no_meal_start_times = []
 
     for time in valid_meals_start_times:
@@ -42,7 +45,6 @@ def extract_no_meal_data(
                 ].min()
             )
 
-    postabsorptive_period_start_times = []
     for datetime in no_meal_start_times:
         if datetime in cgm_df["Datetime"]:
             postabsorptive_period_start_times.append(datetime)
@@ -51,7 +53,7 @@ def extract_no_meal_data(
                 "Datetime"
             ].min()
             postabsorptive_period_start_times.append(cgm_time_after_postprandial_end)
-    total_postabsorptive_datetimes = []
+
     for i in range(len(postprandial_period_start_times)):
         meal_start = postprandial_period_start_times[i]
         meal_end = meal_start + pd.Timedelta(hours=2)
@@ -77,26 +79,16 @@ def extract_no_meal_data(
         j for i in total_postabsorptive_datetimes for j in i
     ]
 
-    no_meal_stretch_datetimes = []
-
-    total_postabsorptive_start_times = []
-    no_meal_stretch_cgm_data = []
-    no_meal_stretch = []
-
     for start_time in postabsorptive_period_start_times[::-1]:
         total_postabsorptive_start_times.append(start_time)
         interval_end = start_time + pd.Timedelta(hours=2)
         stretch_datetimes = (cgm_df["Datetime"] >= start_time) & (
             cgm_df["Datetime"] < interval_end
         )
-        cgm_stretch = cgm_df[stretch_datetimes]["Sensor Glucose (mg/dL)"]
-        date_stretch = cgm_df[stretch_datetimes]["Datetime"]
-        stretch = date_stretch = cgm_df[stretch_datetimes][
+        stretch_data = date_stretch = cgm_df[stretch_datetimes][
             ["Datetime", "Sensor Glucose (mg/dL)"]
         ]
-        no_meal_stretch.append(stretch)
-        no_meal_stretch_datetimes.append(date_stretch)
-        no_meal_stretch_cgm_data.append(cgm_stretch)
+        no_meal_stretch.append(stretch_data)
         for dt in total_postabsorptive_datetimes[::-1]:
             # if start_time <= dt <= interval_end:
             #     no_meal_stretch_datetimes.append(dt)
@@ -107,14 +99,10 @@ def extract_no_meal_data(
                     stretch_datetimes = (cgm_df["Datetime"] >= start_time) & (
                         cgm_df["Datetime"] < interval_end
                     )
-                    cgm_stretch = cgm_df[stretch_datetimes]["Sensor Glucose (mg/dL)"]
-                    date_stretch = cgm_df[stretch_datetimes]["Datetime"]
-                    stretch = cgm_df[stretch_datetimes][
+                    stretch_data = cgm_df[stretch_datetimes][
                         ["Datetime", "Sensor Glucose (mg/dL)"]
                     ]
-                    no_meal_stretch.append(stretch)
-                    no_meal_stretch_datetimes.append(date_stretch)
-                    no_meal_stretch_cgm_data.append(cgm_stretch)
+                    no_meal_stretch.append(stretch_data)
                     total_postabsorptive_start_times.append(start_time)
                 else:
                     break
@@ -125,15 +113,16 @@ def extract_no_meal_data(
         and not x["Sensor Glucose (mg/dL)"].hasnans
     ]
 
-    no_meal_stretch_cgm_data = [
-        x for x in no_meal_stretch_cgm_data if len(x) == 24 and not x.hasnans
-    ]
-
-    no_meal = [x["Sensor Glucose (mg/dL)"] for x in no_meal_stretch]
     return no_meal_stretch[::-1]
 
 
 def extract_cgm_data(cgm_df, insulin_df):
+
+    postprandial_period_start_times = []
+    valid_meals_start_times = []
+    valid_postprandial_datetimes = []
+    meal_stretch = []
+
     meals_start_times = insulin_df[
         (insulin_df["BWZ Carb Input (grams)"].isna() == False)
         & (insulin_df["BWZ Carb Input (grams)"])
@@ -143,7 +132,7 @@ def extract_cgm_data(cgm_df, insulin_df):
     # print("total meal start times: ", len(meals_start_times))
 
     # Initialize an empty list to store the start times of postprandial periods
-    postprandial_period_start_times = []
+
     # Iterate over each valid meal start time
     for datetime in meals_start_times:
         # Check if the current datetime exists in the cgm_datetime list
@@ -160,18 +149,6 @@ def extract_cgm_data(cgm_df, insulin_df):
 
             postprandial_period_start_times.append(cgm_time_after_meal_intake)
 
-    # print("total postprandial start times: ", len(postprandial_period_start_times))
-    postprandial_datetimes = dict()
-    for start_time in postprandial_period_start_times:
-        postprandial_datetimes[start_time] = cgm_df[
-            (cgm_df["Datetime"] >= start_time)
-            & (cgm_df["Datetime"] <= start_time + pd.Timedelta(hours=2))
-        ]["Datetime"]
-
-    # print("total postprandial datetimes: ", len(postprandial_datetimes.keys()))
-
-    valid_meals_start_times = []
-
     # Iterate over the meals start times
     for i, datetime in enumerate(postprandial_period_start_times):
         # Append the last meal start time (since the dates in the DataFrame are in descending order) to the valid_meals_start_times list
@@ -185,7 +162,6 @@ def extract_cgm_data(cgm_df, insulin_df):
         # Otherwise, append the current meal start time to the valid_meals_start_times list
         valid_meals_start_times.append(datetime)
 
-    valid_postprandial_datetimes = []
     for start_time in valid_meals_start_times:
         valid_postprandial_datetimes.append(
             cgm_df[
@@ -194,11 +170,6 @@ def extract_cgm_data(cgm_df, insulin_df):
             ]["Datetime"]
         )
 
-    meal_stretch_cgm_data = []
-    meal_stretch_datetimes = []
-    meal_stretch = []
-    postprandial_period_datetimes = []
-    postabsorptive = []
     # Iterate over each postprandial period start time
     for i, start_time in enumerate(valid_meals_start_times):
         # Extract the sensor glucose values from the CGM data
@@ -209,20 +180,8 @@ def extract_cgm_data(cgm_df, insulin_df):
             cgm_df["Datetime"] < start_time + pd.Timedelta(hours=2)
         ) & (cgm_df["Datetime"] >= start_time - pd.Timedelta(hours=0.5))
 
-        meal_stretch_cgm_data.append(
-            cgm_df[stretch_datetimes]["Sensor Glucose (mg/dL)"]
-        )
-
-        meal_stretch_datetimes.append(cgm_df[stretch_datetimes]["Datetime"])
-
         meal_stretch.append(
             cgm_df[stretch_datetimes][["Datetime", "Sensor Glucose (mg/dL)"]]
-        )
-        postprandial_period_datetimes.append(
-            cgm_df[
-                (cgm_df["Datetime"] <= start_time + pd.Timedelta(hours=2))
-                & (cgm_df["Datetime"] >= start_time)
-            ]["Datetime"]
         )
 
     meal_stretch = [
@@ -232,11 +191,6 @@ def extract_cgm_data(cgm_df, insulin_df):
         and not x["Sensor Glucose (mg/dL)"].hasnans
     ]
 
-    meal_stretch_cgm_data = [
-        x for x in meal_stretch_cgm_data if len(x) == 30 and not x.hasnans
-    ]
-
-    meal = [x["Sensor Glucose (mg/dL)"] for x in meal_stretch]
     no_meal_stretch = extract_no_meal_data(
         valid_meals_start_times, postprandial_period_start_times, insulin_df, cgm_df
     )
